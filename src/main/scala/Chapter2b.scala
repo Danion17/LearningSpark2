@@ -48,7 +48,7 @@ object Chapter2b {
       .orderBy("State")
     aggDF.show()
 
-    //trabajar sobre SQL usando tablas temporales:
+    //doing sql queries over a temp view:
 
     mnmDF.createTempView("sweets")
     spark.sql("SELECT DISTINCT state FROM sweets ORDER BY state").show()

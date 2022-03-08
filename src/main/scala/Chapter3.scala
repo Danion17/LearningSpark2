@@ -61,12 +61,13 @@ ORDER by delay DESC""").show(10)
  FROM us_delay_flights_tbl
  ORDER BY origin, delay DESC""").show(10)
 
-  val query2 = flightsDF.orderBy($"origin",$"delay".desc).withColumn("Flight_Delays",
+  val query2 = flightsDF.withColumn("Flight_Delays",
     when($"delay"> 360,"Very Long Delays")
     .when($"delay" > 120,"Long Delays")
     .when($"delay" > 60,"Short Delays")
     .when($"delay" > 0,"Tolerable Delays")
     .otherwise("No delays")).select("delay","origin","destination","Flight_Delays")
+    .orderBy($"origin",$"delay".desc)
   query2.show()
 
   //APARTADO B):
