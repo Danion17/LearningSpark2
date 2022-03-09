@@ -96,6 +96,4 @@ ORDER by delay DESC""").show(10)
 
 
 
-
-
 }

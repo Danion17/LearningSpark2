@@ -11,106 +11,129 @@ from pyspark.sql.functions import *
 
 def main():
     
-    spark = (SparkSession.builder.master(master = "local")
-      .appName(name = "curso")
-      .config("spark.some.config.option", "some-value")
-      .getOrCreate())
-    spark.sparkContext.setLogLevel("ERROR")
-    
-    
-    print("apartado A")
-    flights_df = (spark.read.option("inferSchema","true").option("header","true")
-   .csv("../resources/departuredelays.csv").repartition(4))
-    
-    flights_df.createTempView("us_delay_flights_tbl")
-    
-    spark.sql("SELECT * FROM us_delay_flights_tbl").show()
-    
-    
-    flights_mod_df = flights_df.select(substring(col("date"),2,2).alias("day"),substring(col("date"),0,2).alias("month")
-                                       ,col("delay"),col("distance"),col("origin"),col("destination"))
-    
-    flights_mod_df.show()
-    
-    #Adapt to dataframes api the followings slq queries:
-        
-    #Query1
-    spark.sql("""SELECT date, delay, origin, destination
-              FROM us_delay_flights_tbl
-              WHERE delay > 120 AND ORIGIN = 'SFO' AND DESTINATION = 'ORD'
-              ORDER by delay DESC""").show(10)
-    
-    query1 = (flights_df.filter(col("delay") >  120 and col("origin") == "SFO" and col("destination") == "ORD")
-                 .orderBy(desc("delay")).select("date","delay","origin","destination"))
-    
-    #Query2:
-        
-    spark.sql("""SELECT delay, origin, destination,
-                 CASE
-                 WHEN delay > 360 THEN 'Very Long Delays'
-                 WHEN delay > 120 AND delay < 360 THEN 'Long Delays'
-                 WHEN delay > 60 AND delay < 120 THEN 'Short Delays'
-                 WHEN delay > 0 and delay < 60 THEN 'Tolerable Delays'
-                 WHEN delay = 0 THEN 'No Delays'
-                 ELSE 'Early'
-                 END AS Flight_Delays
-                 FROM us_delay_flights_tbl
-                 ORDER BY origin, delay DESC""").show(10)
-                 
-    query2 = (flights_df.withColumn("Flight_Delays", when(col("delay") > 360,"Very Long Delays")
-                                   .when(col("delay") > 120,"Long Delays")
-                                   .when(col("delay") > 60,"Short Delays")
-                                   .when(col("delay") > 0,"Torelable Delays")
-                                   .otherwise("No delays")).select("delay","origin","destination","Flight_Delays")
-              .orderBy(col("origin"),col("delay").desc))
-    
-    
-    query2.show()
-    
-    
-    #For the written answers check the scala version of this chapter
-    print("apartadoB")
-    flights_df.printSchema()
-    
-    
-    #Apartado E
-    
-    #Parquet:
-        
-    flights_df.write.format("parquet").mode("overwrite").save("../resources/outputs/flight_parquet")
-     
-    #json:
-        
-    flights_df.write.format("json").mode("overwrite").save("../resources/outputs/flight_parquet")
-    
-    #csv:
-        
-    flights_df.write.format("csv").mode("overwrite").save("../resources/outputs/flight_parquet")
-    
-    #avro:
-        
-    flights_df.write.format("avro").mode("overwrite").save("../resources/outputs/flight_parquet")
-    
-    
-    print("apartado f")
-    
-    print(flights_df.rdd.getNumPartitions)
-    
-    flights_df2 = flights_df.repartition(1)
-    
-    flights_df2.write.format("csv").mode("overwrite").save("../resources/outputs/flight_parquet")
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+  spark = (SparkSession.builder
+    .master(master = "local")
+    .appName(name = "curso")
+    .config("spark.some.config.option", "some-value")
+    .getOrCreate())
+  spark.sparkContext.setLogLevel("ERROR")
+
+
+
+  #APARTADO A)
+
+  print("Apartado a):")
+  raw_fire_calls_df = (spark.read.option("inferSchema","true").option("header","true")
+    .csv("../resources/sf-fire-calls.csv"))
+
+  fire_calls_df = raw_fire_calls_df.withColumn("CallDate",to_date(col("CallDate"),"MM/dd/yyyy"))
+
+
+
+
+  #Exercises page 68 (92 pdf)
+
+  #What were all the different types of fire calls in 2018?
+  print("What were all the different types of fire calls in 2018?")
+  fire_call_types_2018 = fire_calls_df.filter(year(col("CallDate")) == 2018).select(col("CallType")).distinct()
+  fire_call_types_2018.show()
+
+
+
+  #What months within the year 2018 saw the highest number of fire calls?
+  print("What months within the year 2018 saw the highest number of fire calls?")
+  fire_calls_counts_by_month_2018 = (fire_calls_df.filter(year(col("CallDate"))==2018).withColumn("Month",month(col("CallDate")))
+    .groupBy("Month").count().select("Month","count"))
+
+  fire_calls_counts_by_month_2018.show()
+
+  #Which neighborhood in San Francisco generated the most fire calls in 2018?
+  print("Which neighborhood in San Francisco generated the most fire calls in 2018?")
+  top_nh_2018 = (fire_calls_df.filter(year(col("CallDate"))==2018).groupBy(col("Neighborhood")).count()
+    .select("Neighborhood").orderBy(desc("count")).limit(1))
+
+  top_nh_2018.show()
+
+  #Which neighborhoods had the worst response times to fire calls in 2018?
+  print("Which neighborhoods had the worst response times to fire calls in 2018?")
+  worst_response_time_2018 = (fire_calls_df.filter(year(col("CallDate"))==2018).groupBy(col("Neighborhood")).avg("Delay")
+    .orderBy(desc("avg(Delay)")).limit(1))
+
+  worst_response_time_2018.show()
+  
+  # Which week in the year in 2018 had the most fire calls?
+  print("Which week in the year in 2018 had the most fire calls?")
+  week_most_fire_calls_2018 = (fire_calls_df.filter(year(col("CallDate")) == 2018 ).withColumn("CallWeek",weekofyear(col("CallDate")))
+    .groupBy(col("CallWeek")).count().select("CallWeek","count").orderBy(desc("count")).limit(1))
+  week_most_fire_calls_2018.show()
+
+  #Is there a correlation between neighborhood, zip code, and number of fire calls?
+  print("Is there a correlation between neighborhood, zip code, and number of fire calls?")
+
+  correlation_firecalls = fire_calls_df.groupBy(col("Neighborhood"),col("Zipcode")).count().select("Neighborhood","Zipcode","count")
+  correlation_firecalls.show()
+
+  #How can we use Parquet files or SQL tables to store this data and read it back?
+
+  #Using spark.read.format("Parquet")..... for Parquet files or...
+
+  #B)
+  print("APARTADO B")
+
+  #Default schema in firecalls dataframe:
+
+  raw_fire_calls_df.printSchema()
+
+  #APARTADO C):
+
+  #El último apartado Booleano significa si puede contener valores nulls o no.
+
+  #APARTADO D):
+
+  #A nivel de código, para crear un dataset se necesita crear una case Class que especifique el formato y tipado de los elementos del dataset
+
+  #Parquet:
+  (fire_calls_df.write.format("parquet")
+    .mode("overwrite")
+    .save("../resources/outputs/firecalls_parquet"))
+
+  #json:
+
+  (fire_calls_df.write.format("json")
+    .mode("overwrite")
+    .save("../resources/outputs/firecalls_json"))
+
+  #csv:
+
+  (fire_calls_df.write.format("csv")
+    .mode("overwrite")
+    .save("../resources/outputs/firecalls_csv"))
+
+  #avro:
+
+  (fire_calls_df.write.format("avro")
+    .mode("overwrite")
+    .save("../resources/outputs/firecalls_avro"))
+
+  #APARTADO F)
+
+  #Que haya más de un fichero asociado al guardar el dataframe se debe al nº de particiones del mismo.
+  #Para comprobar el numero de particiones:
+
+  print("APARTADO F)")
+  print(fire_calls_df.rdd.getNumPartitions)
+
+  #Para modificar el nº de particiones:
+
+  fire_calls_df2 = fire_calls_df.repartition(1)
+
+  #Ahora volvemos a guarda, solo haremos una sola escritura como ejemplo:
+
+  (fire_calls_df2.write.format("csv")
+    .mode("overwrite")
+    .option("header","true")
+    .save("../resources/outputs/firecalls_csv_1partition"))
+
     
     
     
