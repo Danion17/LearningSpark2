@@ -1,0 +1,218 @@
+1.1   CREATE DATABASE datos_padron;
+      USE datos_padron;
+1.2	
+CREATE TABLE padron_txt( COD_DISTRITO INT,DESC_DISTRITO STRING,
+COD_DIST_BARRIO INT, DESC_BARRIO STRING, COD_BARRIO INT,
+COD_DIST_SECCION INT, COD_SECCION INT, COD_EDAD_INT INT,
+EspanolesHombres INT, EspanolesMujeres INT,
+ExtranjerosHombres INT, ExtranjerosMujeres INT)
+ROW FORMAT 
+SERDE 'org.apache.hadoop.hive.serde2.OpenCSVSerde'
+WITH SERDEPROPERTIES ( "separatorChar" = "\073")
+STORED AS TEXTFILE
+tblproperties ('skip.header.line.count'='1');
+
+LOAD DATA LOCAL INPATH "Rango_Edades_Seccion_202203.csv"
+INTO TABLE padron_txt;
+
+1.3
+
+CREATE TABLE padron_txt_2 AS
+SELECT COD_DISTRITO, TRIM(DESC_DISTRITO),
+COD_DIST_BARRIO, TRIM(DESC_BARRIO),COD_BARRIO,
+COD_DIST_SECCION ,COD_SECCION , COD_EDAD_INT ,
+EspanolesHombres ,EspanolesMujeres ,
+ExtranjerosHombres ,ExtranjerosMujeres 
+FROM padron_txt;
+
+1.4
+LOCAL: path de sistema local de archivos
+Sin LOCAL: path del sistema hdfs
+
+1.5
+
+CREATE TABLE padron_txt_3 AS
+SELECT COD_DISTRITO, TRIM(DESC_DISTRITO),
+COD_DIST_BARRIO, TRIM(DESC_BARRIO),COD_BARRIO,
+COD_DIST_SECCION ,COD_SECCION , COD_EDAD_INT ,
+CASE WHEN LENGTH(EspanolesHombres) = 0 THEN 0
+ELSE (EspanolesHombres)
+END AS EspanolesHombres,
+CASE WHEN LENGTH(EspanolesMujeres) = 0 THEN 0
+ELSE EspanolesMujeres 
+END AS EspanolesMujeres,
+CASE WHEN LENGTH(ExtranjerosHombres) = 0 THEN 0
+ELSE (ExtranjerosHombres )
+END AS ExtranjerosHombres ,
+CASE WHEN LENGTH(ExtranjerosMujeres ) = 0 THEN 0
+ELSE (ExtranjerosMujeres  )
+END AS ExtranjerosMujeres  
+FROM padron_txt;
+
+
+1.6
+CREATE TABLE padron_txt_2( COD_DISTRITO INT,DESC_DISTRITO STRING,
+COD_DIST_BARRIO INT, DESC_BARRIO STRING, COD_BARRIO INT,
+COD_DIST_SECCION INT, COD_SECCION INT, COD_EDAD_INT INT,
+EspanolesHombres INT, EspanolesMujeres INT,
+ExtranjerosHombres INT, ExtranjerosMujeres INT)
+ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.RegexSerDe'
+WITH SERDEPROPERTIES ('input.regex'= '
+"^\\"(\\d+)\"\\;\\"(\\w+)\\s*\\"\\;\\"(\\d+)\\"\\;\\"(\\w+)\\s*\\"\\;\\"(\\d+)\\"\\;\\"(\\d*)\\"\\;\\"(\\d*)\\"\\;\\"(\\d*)\\"\\;\\"(\\d*)\\"\\;\\"(\\d*)\\"\\;\\"(\\d*)\\"\\;\\"(\\d*)\\""'
+)
+STORED AS TEXTFILE
+tblproperties ('skip.header.line.count'='1');
+
+LOAD DATA LOCAL INPATH "Rango_Edades_Seccion_202203.csv"
+INTO TABLE padron_txt_2;
+
+2.1
+
+CTAS --> CREATE TABLE AS SELECT.....
+
+2.2
+
+CREATE TABLE padron_parquet 
+STORED AS PARQUET
+AS SELECT * FROM padron_txt;
+
+2.3
+
+CREATE TABLE padron_parquet_2 
+STORED AS PARQUET
+AS SELECT * FROM padron_txt_2;
+
+
+2.4 ----
+
+2.5
+Principal característica parquet: basado en columnas.
+2.6
+-rwxrwxrwx   1 root supergroup     934267 2022-03-15 16:30 /user/hive/warehouse/datos_padron.db/padron_parquet/000000_0
+
+-rwxrwxrwx   1 root supergroup     932190 2022-03-15 16:37 /user/hive/warehouse/datos_padron.db/padron_parquet_2/000000_0
+
+3.1
+
+Impala: motor de consulta SQL sobre ecosistemas Apache Hadoop
+3.2
+
+Impala trabaja en memoria, por lo que puede realizar consultas
+con menor latencia que Hive, aunque manejará menor volumen de datos.
+
+3.3
+
+INVALIDATE METADATA 
+
+marca los metadatos de impala como invalidos y hace una recarga completa de todos los datos
+manualmente, para así cargar cambios no realizados en impala (como los hechos anteriormente
+en hive).
+3.4
+
+
+3.5
+
+3.6
+
+3.7
+
+3.8
+
+4.1
+
+CREATE TABLE padron_particionado( COD_DISTRITO INT,
+COD_DIST_BARRIO INT,  COD_BARRIO INT,
+COD_DIST_SECCION INT, COD_SECCION INT, COD_EDAD_INT INT,
+EspanolesHombres INT, EspanolesMujeres INT,
+ExtranjerosHombres INT, ExtranjerosMujeres INT)
+PARTITIONED BY (DESC_DISTRITO STRING,DESC_BARRIO STRING)
+ROW FORMAT 
+SERDE 'org.apache.hadoop.hive.serde2.OpenCSVSerde'
+WITH SERDEPROPERTIES ( "separatorChar" = "\073")
+STORED AS TEXTFILE
+tblproperties ('skip.header.line.count'='1');
+
+4.2
+
+INSERT INTO padron_particionado PARTITION( DESC_DISTRITO,DESC_BARRIO) 
+SELECT * FROM padron_txt;
+
+4.3
+
+4.4
+
+SELECT SUM(espanoleshombres),SUM(espanolesmujeres),SUM(extranjeroshombres),SUM(extranjerosmujeres)
+FROM padron_particionado GROUP BY desc_distrito,desc_barrio
+WHERE desc_distrito = "CENTRO" OR
+desc_distrito = "CHAMARTIN" OR
+desc_distrito = "TETUAN" OR
+desc_distrito = "VICALVARO" OR
+desc_distrito = "BARAJAS"; 
+
+4.5
+
+4.6
+
+4.7
+
+5.1
+
+5.2
+
+5.3
+
+5.4
+
+5.5
+
+5.7
+
+5.7
+
+5.8
+
+5.9
+
+5.10
+
+5.11
+
+6.1
+
+6.2
+
+6.3
+
+6.4
+
+6.5
+
+6.6
+
+6.7
+
+6.8
+
+6.9
+
+6.10
+
+6.11
+
+6.12
+
+6.13
+
+6.14
+
+6.15
+
+6.16
+
+6.17
+
+7.1
+
+
+
+
