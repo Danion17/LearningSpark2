@@ -1,5 +1,6 @@
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.expressions.Window
 
 object Padron extends App{
 
@@ -47,7 +48,7 @@ object Padron extends App{
 
   //6.8
 
-  padronDF2.write.partitionBy("DESC_DISTRITO","DESC_BARRIO")
+  padronDF2.write.mode("overwrite").partitionBy("DESC_DISTRITO","DESC_BARRIO")
     .csv("src/main/resources/outputs/padron")
 
   //6.9
@@ -69,13 +70,45 @@ object Padron extends App{
   val totalHombresDF = padronDF2.groupBy($"DESC_DISTRITO",$"DESC_BARRIO").sum("EspanolesHombres")
     .select($"DESC_DISTRITO",$"DESC_BARRIO",$"sum(EspanolesHombres)".as("TotalEspanolesHombres"))
 
-  val joinDF = padronDF2.join(totalHombresDF.as("th"),($"th.DESC_DISTRITO" === $"DESC_DISTRITO")
-  && ($"th.DESC_BARRIO" === $"DESC_BARRIO"))
+  val joinDF = padronDF2.join(totalHombresDF.as("th"),($"th.DESC_DISTRITO" === padronDF2.col("DESC_DISTRITO"))
+  && ($"th.DESC_BARRIO" === padronDF2.col("DESC_BARRIO")))
 
   joinDF.show(5)
 
   //6.13
-  
+
+  val windowPadron = Window.partitionBy("DESC_DISTRITO","DESC_BARRIO")
+
+  val padronWindowDF = padronDF2.withColumn("TotalEspanolesHombres",sum($"EspanolesHombres").over(windowPadron))
+  padronWindowDF.show()
+
+  //6.14
+
+  val pivotPadron = padronDF2.where($"DESC_DISTRITO" === "BARAJAS" ||$"DESC_DISTRITO" === "CENTRO" || $"DESC_DISTRITO" === "RETIRO")
+    .groupBy("COD_EDAD_INT").pivot($"DESC_DISTRITO").sum("EspanolesMujeres").orderBy($"COD_EDAD_INT")
+
+  pivotPadron.show()
+
+  //6.15
+
+  val pivorPercentageDF = pivotPadron.withColumn("BarajasPercentage",$"BARAJAS" / sum($"BARAJAS").over(Window.partitionBy()))
+    .withColumn("CentroPercentage",$"CENTRO" / sum($"CENTRO").over(Window.partitionBy()))
+    .withColumn("RetiroPercentage",$"RETIRO" / sum($"RETIRO").over(Window.partitionBy()))
+
+  pivorPercentageDF.show()
+
+  //6.16
+
+  padronDF.write.mode("overwrite")
+    .partitionBy("DESC_DISTRITO","DESC_BARRIO")
+    .csv("src/main/resources/outputs/padronCSV")
+
+  //6.17
+  padronDF.write.mode("overwrite")
+    .partitionBy("DESC_DISTRITO","DESC_BARRIO")
+    .parquet("src/main/resources/outputs/padronParquet")
+
+
 
 
 
