@@ -1,2 +1,3 @@
 # LearningSpark2
- Exercises from the book Learning Spark 2nd Edition
+ List of exercises from the book Learning Spark 2nd Edition, and other different exercise sources.
+
